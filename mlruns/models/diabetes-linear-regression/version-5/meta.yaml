@@ -1,0 +1,16 @@
+aliases: []
+creation_timestamp: 1761098338581
+current_stage: Production
+description: null
+last_updated_timestamp: 1761098344186
+name: diabetes-linear-regression
+run_id: d80f24f859944a828f5814c6fc7e6ece
+run_link: null
+source: file:///D:/04-EAN/03 - Maestria en Ciencias de Datos/11- Mlops y Analítica
+  en la Nube/Talleres/Taller Final/mlflow-deploy/mlruns/102350396495648614/d80f24f859944a828f5814c6fc7e6ece/artifacts/model
+status: READY
+status_message: null
+storage_location: file:///D:/04-EAN/03 - Maestria en Ciencias de Datos/11- Mlops y
+  Analítica en la Nube/Talleres/Taller Final/mlflow-deploy/mlruns/102350396495648614/d80f24f859944a828f5814c6fc7e6ece/artifacts/model
+user_id: null
+version: 5

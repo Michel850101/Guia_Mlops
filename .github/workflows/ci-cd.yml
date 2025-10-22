@@ -1,55 +1,54 @@
+# .github/workflows/ci-cd.yml
 name: MLOps CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  push: { branches: [ main ] }
+  pull_request: { branches: [ main ] }
   workflow_dispatch:
 
 jobs:
   train-and-validate:
     runs-on: ubuntu-latest
-    
+    env:
+      PYTHONUTF8: "1"
+      MPLBACKEND: "Agg"        # evita backends GUI de matplotlib
+      THRESHOLD_MSE: "3000"    # usado por validate.py
+
     steps:
-      - name: 📥 Checkout código
+      - name: 📥 Checkout
         uses: actions/checkout@v4
-      
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
-      
-      - name: 📦 Instalar dependencias
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install deps
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install -U pip
           pip install -r requirements.txt
-      
-      - name: 🚂 Entrenar modelo
-        run: |
-          echo "Iniciando entrenamiento del modelo..."
-          python src/train.py
-      
-      - name: ✅ Validar modelo
-        run: |
-          echo "Validando modelo..."
-          python src/validate.py
-      
-      - name: 📤 Subir artefactos MLflow
+
+      - name: 🚂 Train
+        run: python src/train.py
+
+      - name: ✅ Validate (fail if MSE >= ${{ env.THRESHOLD_MSE }})
+        run: python src/validate.py
+
+      - name: 📤 Upload MLflow dir
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mlflow-artifacts
           path: mlruns/
+          if-no-files-found: error
           retention-days: 30
-      
-      - name: 📤 Subir modelo
+
+      - name: 📤 Upload trained model
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: trained-model
-          path: mlruns/**/artifacts/model/
+          path: mlruns/**/artifacts/model/**
+          if-no-files-found: error
           retention-days: 90
