@@ -1,5 +1,6 @@
 # .github/workflows/ci-cd.yml
 name: MLOps CI/CD Pipeline
+
 on:
   push: { branches: [ main ] }
   pull_request: { branches: [ main ] }
@@ -13,32 +14,56 @@ jobs:
       MPLBACKEND: "Agg"
       THRESHOLD_MSE: "3000"
       MLFLOW_TRACKING_URI: "file:./mlruns"
-      MLFLOW_ARTIFACT_URI: "file:./mlruns"   # clave
+      MLFLOW_ARTIFACT_URI: "file:./mlruns"
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11", cache: "pip" }
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
 
-      - name: Install deps
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Instalar dependencias
         run: |
           python -m pip install -U pip
           pip install -r requirements.txt
 
-      - name: Sanity MLflow env
+      - name: 🧩 Sanidad entorno MLflow
         run: |
-          env | grep -E '^MLFLOW_' || true
+          echo "🔍 Antes:"; env | grep -E '^(MLFLOW|DATABRICKS)_' || true
+          unset MLFLOW_ARTIFACT_URI MLFLOW_ARTIFACT_LOCATION MLFLOW_TRACKING_TOKEN \
+                MLFLOW_TRACKING_USERNAME MLFLOW_TRACKING_PASSWORD \
+                DATABRICKS_HOST DATABRICKS_TOKEN || true
+          echo "✅ Después:"; env | grep -E '^(MLFLOW|DATABRICKS)_' || true
 
-      - name: Train
+      - name: 🚂 Entrenar modelo
         run: python src/train.py
 
-      - name: Validate
+      - name: ✅ Validar modelo
         run: python src/validate.py
 
-      - name: Upload MLflow dir
+      - name: 📤 Subir MLflow dir
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mlflow-artifacts
           path: mlruns/
           if-no-files-found: error
+
+      - name: 📊 Resumen del pipeline
+        if: always()
+        run: |
+          {
+            echo "## 📊 Resumen del Pipeline MLOps"
+            echo ""
+            echo "### ✅ Pipeline completado"
+            echo "- Código clonado"
+            echo "- Dependencias instaladas"
+            echo "- Modelo entrenado"
+            echo "- Modelo validado"
+            echo ""
+            echo "Los artefactos están disponibles en la pestaña Actions."
+          } >> "$GITHUB_STEP_SUMMARY"
