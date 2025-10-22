@@ -13,20 +13,18 @@ from mlflow.models import infer_signature
 
 
 def setup_mlflow():
-    # Fuerza tracking local en el runner
+    import mlflow
+    import os
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
-    # Limpia variable problemática si existe
+    # neutraliza valores heredados
     os.environ.pop("MLFLOW_ARTIFACT_URI", None)
-
     print(f"✓ Tracking URI: {mlflow.get_tracking_uri()}")
 
-    # Usa set_experiment: crea si no existe y mantiene artifact_location correcta
     experiment_name = "diabetes-regression"
     mlflow.set_experiment(experiment_name)
     exp = mlflow.get_experiment_by_name(experiment_name)
     print(f"✓ Experimento '{experiment_name}' (ID: {exp.experiment_id})")
     return exp.experiment_id
-
 
 def load_and_split_data(test_size=0.2, random_state=42):
     """Carga y divide el dataset Diabetes"""
@@ -74,11 +72,10 @@ def train_and_log_model(experiment_id, X_train, X_test, y_train, y_test):
         
         # Registrar modelo en MLflow
         mlflow.sklearn.log_model(
-            sk_model=model,
-            artifact_path="model",
-            signature=signature,
-            registered_model_name="diabetes-linear-regression"
-        )
+    sk_model=model,
+    artifact_path="model"
+    # quita registered_model_name para evitar Model Registry en runner efímero
+)
         
         # Mostrar resultados
         print(f"\n{'='*50}")

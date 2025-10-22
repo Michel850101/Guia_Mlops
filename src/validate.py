@@ -10,9 +10,8 @@ from pathlib import Path
 
 def setup_tracking_uri():
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
-    os.environ.pop("MLFLOW_ARTIFACT_URI", None)
-    print(f"✓ Tracking URI: {mlflow.get_tracking_uri()}")
-    return "./mlruns"
+os.environ.pop("MLFLOW_ARTIFACT_URI", None)
+threshold_mse = float(os.getenv("THRESHOLD_MSE", "3000"))
 
 def get_latest_run(experiment_name, threshold_mse=3000):
     """
