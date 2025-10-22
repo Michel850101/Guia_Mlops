@@ -84,12 +84,6 @@ def train_and_log_model(experiment_id, X_train, X_test, y_train, y_test):
             registered_model_name="diabetes-linear-regression"
         )
         
-        # Guardar también como .pkl para compatibilidad
-        import joblib
-        model_path = os.path.join(os.getcwd(), "model.pkl")
-        joblib.dump(model, model_path)
-        print(f"✓ Modelo guardado también en: {model_path}")
-        
         # Mostrar resultados
         print(f"\n{'='*50}")
         print(f"Run ID: {run.info.run_id}")
