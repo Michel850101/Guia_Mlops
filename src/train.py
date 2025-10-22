@@ -1,117 +1,139 @@
+"""
+Script de entrenamiento con MLflow
+Entrena un modelo de regresión lineal con el dataset Diabetes
+"""
 import os
 import mlflow
 import mlflow.sklearn
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-import pandas as pd
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from mlflow.models import infer_signature
-import sys
-import traceback
 
-print(f"--- Debug: Initial CWD: {os.getcwd()} ---")
 
-# --- Define Paths ---
-# Usar rutas absolutas dentro del workspace del runner
-workspace_dir = os.getcwd() # Debería ser /home/runner/work/mlflow-deploy/mlflow-deploy
-mlruns_dir = os.path.join(workspace_dir, "mlruns")
-tracking_uri = "file://" + os.path.abspath(mlruns_dir)
-# Definir explícitamente la ubicación base deseada para los artefactos
-artifact_location = "file://" + os.path.abspath(mlruns_dir)
-
-print(f"--- Debug: Workspace Dir: {workspace_dir} ---")
-print(f"--- Debug: MLRuns Dir: {mlruns_dir} ---")
-print(f"--- Debug: Tracking URI: {tracking_uri} ---")
-print(f"--- Debug: Desired Artifact Location Base: {artifact_location} ---")
-
-# --- Asegurar que el directorio MLRuns exista ---
-os.makedirs(mlruns_dir, exist_ok=True)
-
-# --- Configurar MLflow ---
-mlflow.set_tracking_uri(tracking_uri)
-
-# --- Crear o Establecer Experimento Explícitamente con Artifact Location ---
-experiment_name = "CI-CD-Lab2"
-experiment_id = None # Inicializar variable
-try:
-    # Intentar crear el experimento, proporcionando la ubicación del artefacto
-    experiment_id = mlflow.create_experiment(
-        name=experiment_name,
-        artifact_location=artifact_location # ¡Forzar la ubicación aquí!
-    )
-    print(f"--- Debug: Creado Experimento '{experiment_name}' con ID: {experiment_id} ---")
-except mlflow.exceptions.MlflowException as e:
-    if "RESOURCE_ALREADY_EXISTS" in str(e):
-        print(f"--- Debug: Experimento '{experiment_name}' ya existe. Obteniendo ID. ---")
-        # Obtener el experimento existente para conseguir su ID
+def setup_mlflow():
+    """Configura el tracking URI y experimento de MLflow"""
+    # Configurar directorio de MLflow
+    mlruns_dir = os.path.join(os.getcwd(), "mlruns")
+    os.makedirs(mlruns_dir, exist_ok=True)
+    
+    # Convertir ruta de Windows a URI válida (file:/// con barras normales)
+    # Reemplazar backslashes por forward slashes y agregar file:///
+    mlruns_uri = mlruns_dir.replace("\\", "/")
+    tracking_uri = f"file:///{mlruns_uri}"
+    
+    mlflow.set_tracking_uri(tracking_uri)
+    
+    print(f"✓ Tracking URI configurado: {tracking_uri}")
+    
+    # Configurar experimento
+    experiment_name = "diabetes-regression"
+    try:
+        experiment_id = mlflow.create_experiment(experiment_name)
+        print(f"✓ Experimento '{experiment_name}' creado con ID: {experiment_id}")
+    except mlflow.exceptions.MlflowException:
         experiment = mlflow.get_experiment_by_name(experiment_name)
-        if experiment:
-            experiment_id = experiment.experiment_id
-            print(f"--- Debug: ID del Experimento Existente: {experiment_id} ---")
-            print(f"--- Debug: Ubicación de Artefacto del Experimento Existente: {experiment.artifact_location} ---")
-            # Opcional: Verificar si la ubicación del artefacto es la correcta
-            if experiment.artifact_location != artifact_location:
-                 print(f"--- WARNING: La ubicación del artefacto del experimento existente ('{experiment.artifact_location}') NO coincide con la deseada ('{artifact_location}')! ---")
-        else:
-            # Esto no debería ocurrir si RESOURCE_ALREADY_EXISTS fue el error
-            print(f"--- ERROR: No se pudo obtener el experimento existente '{experiment_name}' por nombre. ---")
-            sys.exit(1)
-    else:
-        print(f"--- ERROR creando/obteniendo experimento: {e} ---")
-        raise e # Relanzar otros errores
-
-# Asegurarse de que tenemos un experiment_id válido
-if experiment_id is None:
-    print(f"--- ERROR FATAL: No se pudo obtener un ID de experimento válido para '{experiment_name}'. ---")
-    sys.exit(1)
-
-# --- Cargar Datos y Entrenar Modelo ---
-X, y = load_diabetes(return_X_y=True)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-model = LinearRegression()
-model.fit(X_train, y_train)
-preds = model.predict(X_test)
-mse = mean_squared_error(y_test, preds)
-
-# --- Iniciar Run de MLflow ---
-print(f"--- Debug: Iniciando run de MLflow en Experimento ID: {experiment_id} ---") # Añadir ID aquí
-run = None
-try:
-    # Iniciar el run PASANDO EXPLÍCITAMENTE el experiment_id
-    with mlflow.start_run(experiment_id=experiment_id) as run: # <--- CAMBIO CLAVE
-        run_id = run.info.run_id
-        actual_artifact_uri = run.info.artifact_uri
-        print(f"--- Debug: Run ID: {run_id} ---")
-        print(f"--- Debug: URI Real del Artefacto del Run: {actual_artifact_uri} ---")
-
-        # Comprobar si coincide con el patrón esperado basado en artifact_location del experimento
-        # (La artifact_uri del run incluirá el run_id)
-        expected_artifact_uri_base = os.path.join(artifact_location, run_id, "artifacts")
-        if actual_artifact_uri != expected_artifact_uri_base:
-             print(f"--- WARNING: La URI del Artefacto del Run '{actual_artifact_uri}' no coincide exactamente con la esperada '{expected_artifact_uri_base}' (esto puede ser normal si la estructura difiere ligeramente). Lo importante es que NO sea la ruta local incorrecta. ---")
-        if "/home/manuelcastiblan/" in actual_artifact_uri:
-             print(f"--- ¡¡¡ERROR CRÍTICO!!!: La URI del Artefacto del Run '{actual_artifact_uri}' TODAVÍA contiene la ruta local incorrecta! ---")
+        experiment_id = experiment.experiment_id
+        print(f"✓ Usando experimento existente '{experiment_name}' (ID: {experiment_id})")
+    
+    return experiment_id
 
 
-        mlflow.log_metric("mse", mse)
-        print(f"--- Debug: Intentando log_model con artifact_path='model' ---")
+def load_and_split_data(test_size=0.2, random_state=42):
+    """Carga y divide el dataset Diabetes"""
+    print("\nCargando datos...")
+    X, y = load_diabetes(return_X_y=True)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state
+    )
+    print(f"✓ Datos cargados: {X_train.shape[0]} train, {X_test.shape[0]} test")
+    return X_train, X_test, y_train, y_test
 
+
+def train_and_log_model(experiment_id, X_train, X_test, y_train, y_test):
+    """Entrena el modelo y registra métricas en MLflow"""
+    print("\nEntrenando modelo...")
+    
+    with mlflow.start_run(experiment_id=experiment_id, run_name="linear_regression") as run:
+        # Entrenar modelo
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+        
+        # Predicciones
+        y_pred_train = model.predict(X_train)
+        y_pred_test = model.predict(X_test)
+        
+        # Calcular métricas
+        train_mse = mean_squared_error(y_train, y_pred_train)
+        test_mse = mean_squared_error(y_test, y_pred_test)
+        test_mae = mean_absolute_error(y_test, y_pred_test)
+        test_r2 = r2_score(y_test, y_pred_test)
+        
+        # Registrar parámetros
+        mlflow.log_param("model_type", "LinearRegression")
+        mlflow.log_param("test_size", 0.2)
+        mlflow.log_param("random_state", 42)
+        
+        # Registrar métricas
+        mlflow.log_metric("train_mse", train_mse)
+        mlflow.log_metric("test_mse", test_mse)
+        mlflow.log_metric("test_mae", test_mae)
+        mlflow.log_metric("test_r2", test_r2)
+        
+        # Inferir signature del modelo
+        signature = infer_signature(X_train, y_pred_train)
+        
+        # Registrar modelo
         mlflow.sklearn.log_model(
             sk_model=model,
-            artifact_path="model"
+            artifact_path="model",
+            signature=signature,
+            registered_model_name="diabetes-linear-regression"
         )
-        print(f"✅ Modelo registrado correctamente. MSE: {mse:.4f}")
+        
+        # Mostrar resultados
+        print(f"\n{'='*50}")
+        print(f"Run ID: {run.info.run_id}")
+        print(f"{'='*50}")
+        print(f"Train MSE: {train_mse:.4f}")
+        print(f"Test MSE:  {test_mse:.4f}")
+        print(f"Test MAE:  {test_mae:.4f}")
+        print(f"Test R²:   {test_r2:.4f}")
+        print(f"{'='*50}")
+        print(f"✓ Modelo registrado exitosamente")
+        
+        return run.info.run_id, model
 
-except Exception as e:
-    print(f"\n--- ERROR durante la ejecución de MLflow ---")
-    traceback.print_exc()
-    print(f"--- Fin de la Traza de Error ---")
-    print(f"CWD actual en el error: {os.getcwd()}")
-    print(f"Tracking URI usada: {mlflow.get_tracking_uri()}")
-    print(f"Experiment ID intentado: {experiment_id}") # Añadir ID aquí
-    if run:
-         print(f"URI del Artefacto del Run en el error: {run.info.artifact_uri}")
-    else:
-         print("El objeto Run no se creó con éxito.")
-    sys.exit(1)
+
+def main():
+    """Función principal"""
+    try:
+        print("Iniciando pipeline de entrenamiento...\n")
+        
+        # Setup MLflow
+        experiment_id = setup_mlflow()
+        
+        # Cargar datos
+        X_train, X_test, y_train, y_test = load_and_split_data()
+        
+        # Entrenar y registrar modelo
+        run_id, model = train_and_log_model(
+            experiment_id, X_train, X_test, y_train, y_test
+        )
+        
+        print(f"\n✅ Pipeline completado exitosamente!")
+        print(f"Run ID: {run_id}")
+        print(f"\nPara ver resultados ejecuta: mlflow ui")
+        
+        return 0
+        
+    except Exception as e:
+        print(f"\n❌ Error durante el entrenamiento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
+if __name__ == "__main__":
+    exit(main())
