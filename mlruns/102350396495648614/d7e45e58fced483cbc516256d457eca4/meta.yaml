@@ -1,0 +1,16 @@
+artifact_uri: file:///D:/04-EAN/03 - Maestria en Ciencias de Datos/11- Mlops y Analítica
+  en la Nube/Talleres/Taller Final/mlflow-deploy/mlruns/102350396495648614/d7e45e58fced483cbc516256d457eca4/artifacts
+end_time: 1761096657467
+entry_point_name: ''
+experiment_id: '102350396495648614'
+lifecycle_stage: active
+run_id: d7e45e58fced483cbc516256d457eca4
+run_name: linear_regression
+run_uuid: d7e45e58fced483cbc516256d457eca4
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761096654208
+status: 3
+tags: []
+user_id: MSLV

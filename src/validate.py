@@ -14,7 +14,6 @@ def setup_tracking_uri():
     print(f"✓ Usando tracking URI por defecto: ./mlruns")
     return "./mlruns"
 
-
 def get_latest_run(experiment_name, threshold_mse=3000):
     """
     Obtiene el último run del experimento y valida el MSE

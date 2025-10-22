@@ -31,7 +31,6 @@ def setup_mlflow():
     
     return experiment_id
 
-
 def load_and_split_data(test_size=0.2, random_state=42):
     """Carga y divide el dataset Diabetes"""
     print("\nCargando datos...")
