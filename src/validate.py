@@ -10,12 +10,9 @@ from pathlib import Path
 
 def setup_tracking_uri():
     """Configura la URI de tracking de MLflow"""
-    mlruns_dir = os.path.join(os.getcwd(), "mlruns")
-    mlruns_uri = mlruns_dir.replace("\\", "/")
-    tracking_uri = f"file:///{mlruns_uri}"
-    mlflow.set_tracking_uri(tracking_uri)
-    print(f"✓ Tracking URI: {tracking_uri}")
-    return tracking_uri
+    # MLflow usa ./mlruns por defecto
+    print(f"✓ Usando tracking URI por defecto: ./mlruns")
+    return "./mlruns"
 
 
 def get_latest_run(experiment_name, threshold_mse=3000):

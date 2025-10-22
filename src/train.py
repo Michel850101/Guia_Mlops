@@ -14,18 +14,10 @@ from mlflow.models import infer_signature
 
 def setup_mlflow():
     """Configura el tracking URI y experimento de MLflow"""
-    # Configurar directorio de MLflow
-    mlruns_dir = os.path.join(os.getcwd(), "mlruns")
-    os.makedirs(mlruns_dir, exist_ok=True)
+    # MLflow usa ./mlruns por defecto, no necesitamos configurar nada
+    # Esto funciona tanto en Windows como en Linux
     
-    # Convertir ruta de Windows a URI válida (file:/// con barras normales)
-    # Reemplazar backslashes por forward slashes y agregar file:///
-    mlruns_uri = mlruns_dir.replace("\\", "/")
-    tracking_uri = f"file:///{mlruns_uri}"
-    
-    mlflow.set_tracking_uri(tracking_uri)
-    
-    print(f"✓ Tracking URI configurado: {tracking_uri}")
+    print(f"✓ Usando tracking URI por defecto: ./mlruns")
     
     # Configurar experimento
     experiment_name = "diabetes-regression"
@@ -84,13 +76,19 @@ def train_and_log_model(experiment_id, X_train, X_test, y_train, y_test):
         # Inferir signature del modelo
         signature = infer_signature(X_train, y_pred_train)
         
-        # Registrar modelo
+        # Registrar modelo en MLflow
         mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path="model",
             signature=signature,
             registered_model_name="diabetes-linear-regression"
         )
+        
+        # Guardar también como .pkl para compatibilidad
+        import joblib
+        model_path = os.path.join(os.getcwd(), "model.pkl")
+        joblib.dump(model, model_path)
+        print(f"✓ Modelo guardado también en: {model_path}")
         
         # Mostrar resultados
         print(f"\n{'='*50}")
