@@ -13,23 +13,19 @@ from mlflow.models import infer_signature
 
 
 def setup_mlflow():
-    """Configura el tracking URI y experimento de MLflow"""
-    # MLflow usa ./mlruns por defecto, no necesitamos configurar nada
-    # Esto funciona tanto en Windows como en Linux
-    
-    print(f"✓ Usando tracking URI por defecto: ./mlruns")
-    
-    # Configurar experimento
+    # Fuerza tracking local en el runner
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
+    # Limpia variable problemática si existe
+    os.environ.pop("MLFLOW_ARTIFACT_URI", None)
+
+    print(f"✓ Tracking URI: {mlflow.get_tracking_uri()}")
+
+    # Usa set_experiment: crea si no existe y mantiene artifact_location correcta
     experiment_name = "diabetes-regression"
-    try:
-        experiment_id = mlflow.create_experiment(experiment_name)
-        print(f"✓ Experimento '{experiment_name}' creado con ID: {experiment_id}")
-    except mlflow.exceptions.MlflowException:
-        experiment = mlflow.get_experiment_by_name(experiment_name)
-        experiment_id = experiment.experiment_id
-        print(f"✓ Usando experimento existente '{experiment_name}' (ID: {experiment_id})")
-    
-    return experiment_id
+    mlflow.set_experiment(experiment_name)
+    exp = mlflow.get_experiment_by_name(experiment_name)
+    print(f"✓ Experimento '{experiment_name}' (ID: {exp.experiment_id})")
+    return exp.experiment_id
 
 
 def load_and_split_data(test_size=0.2, random_state=42):

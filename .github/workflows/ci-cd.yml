@@ -1,41 +1,29 @@
-# .github/workflows/ci-cd.yml
-name: MLOps CI/CD Pipeline
-
-on:
-  push: { branches: [ main ] }
-  pull_request: { branches: [ main ] }
-  workflow_dispatch:
-
 jobs:
   train-and-validate:
     runs-on: ubuntu-latest
     env:
       PYTHONUTF8: "1"
-      MPLBACKEND: "Agg"        # evita backends GUI de matplotlib
-      THRESHOLD_MSE: "3000"    # usado por validate.py
-
+      MPLBACKEND: "Agg"
+      THRESHOLD_MSE: "3000"
+      MLFLOW_TRACKING_URI: "file:./mlruns"   # fuerza tracking local
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: 📦 Install deps
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: "pip" }
+      - name: Install deps
         run: |
           python -m pip install -U pip
           pip install -r requirements.txt
-
-      - name: 🚂 Train
+      - name: Sanitize MLflow env
+        run: |
+          echo "Before:"; env | grep -E '^MLFLOW_|^D:' || true
+          unset MLFLOW_ARTIFACT_URI || true
+          echo "After:"; env | grep -E '^MLFLOW_|^D:' || true
+      - name: Train
         run: python src/train.py
-
-      - name: ✅ Validate (fail if MSE >= ${{ env.THRESHOLD_MSE }})
+      - name: Validate
         run: python src/validate.py
-
-      - name: 📤 Upload MLflow dir
+      - name: Upload MLflow dir
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -43,8 +31,7 @@ jobs:
           path: mlruns/
           if-no-files-found: error
           retention-days: 30
-
-      - name: 📤 Upload trained model
+      - name: Upload trained model
         if: success()
         uses: actions/upload-artifact@v4
         with:

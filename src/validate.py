@@ -9,9 +9,9 @@ from pathlib import Path
 
 
 def setup_tracking_uri():
-    """Configura la URI de tracking de MLflow"""
-    # MLflow usa ./mlruns por defecto
-    print(f"✓ Usando tracking URI por defecto: ./mlruns")
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
+    os.environ.pop("MLFLOW_ARTIFACT_URI", None)
+    print(f"✓ Tracking URI: {mlflow.get_tracking_uri()}")
     return "./mlruns"
 
 def get_latest_run(experiment_name, threshold_mse=3000):
@@ -128,7 +128,7 @@ def main():
         experiment_name = "diabetes-regression"
         
         # Umbral de MSE (ajústalo según necesites)
-        threshold_mse = 3000
+        threshold_mse = float(os.getenv("THRESHOLD_MSE", "3000"))
         
         # Validar último run
         run_id = get_latest_run(experiment_name, threshold_mse)
