@@ -1,62 +1,163 @@
-# src/validate.py
-import joblib
-import pandas as pd
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import load_diabetes  # Importar load_diabetes
-import sys
+"""
+Script de validación del modelo
+Valida que el MSE del último run sea aceptable antes de promover el modelo
+"""
 import os
+import sys
+import mlflow
+from pathlib import Path
 
-# Parámetro de umbral
-THRESHOLD = 5000.0  # Ajusta este umbral según el MSE esperado para load_diabetes
 
-# --- Cargar el MISMO dataset que en train.py ---
-print("--- Debug: Cargando dataset load_diabetes ---")
-X, y = load_diabetes(return_X_y=True, as_frame=True)  # Usar as_frame=True si quieres DataFrames
+def setup_tracking_uri():
+    """Configura la URI de tracking de MLflow"""
+    mlruns_dir = os.path.join(os.getcwd(), "mlruns")
+    mlruns_uri = mlruns_dir.replace("\\", "/")
+    tracking_uri = f"file:///{mlruns_uri}"
+    mlflow.set_tracking_uri(tracking_uri)
+    print(f"✓ Tracking URI: {tracking_uri}")
+    return tracking_uri
 
-# División de datos (usar los mismos datos que en entrenamiento no es ideal para validación real,
-# pero necesario aquí para que las dimensiones coincidan. Idealmente, tendrías un split dedicado
-# o usarías el X_test guardado del entrenamiento si fuera posible)
-# Para este ejemplo, simplemente re-dividimos para obtener un X_test con 10 features.
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)  # Añadir random_state para consistencia si es necesario
-print(f"--- Debug: Dimensiones de X_test: {X_test.shape} ---")  # Debería ser (n_samples, 10)
 
-# --- Cargar modelo previamente entrenado ---
-model_filename = "model.pkl"
-model_path = os.path.abspath(os.path.join(os.getcwd(), model_filename))
-print(f"--- Debug: Intentando cargar modelo desde: {model_path} ---")
+def get_latest_run(experiment_name, threshold_mse=3000):
+    """
+    Obtiene el último run del experimento y valida el MSE
+    
+    Args:
+        experiment_name: Nombre del experimento
+        threshold_mse: Umbral máximo aceptable de MSE
+    
+    Returns:
+        run_id del modelo validado o None si falla
+    """
+    print(f"\n{'='*60}")
+    print(f"Validando modelo del experimento: {experiment_name}")
+    print(f"{'='*60}\n")
+    
+    # Obtener experimento
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    
+    if experiment is None:
+        print(f"❌ Experimento '{experiment_name}' no encontrado")
+        return None
+    
+    print(f"✓ Experimento encontrado (ID: {experiment.experiment_id})")
+    
+    # Buscar runs ordenados por fecha
+    runs = mlflow.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        order_by=["start_time DESC"],
+        max_results=1
+    )
+    
+    if runs.empty:
+        print("❌ No se encontraron runs en el experimento")
+        return None
+    
+    # Obtener métricas del último run
+    latest_run = runs.iloc[0]
+    run_id = latest_run["run_id"]
+    mse = latest_run["metrics.test_mse"]
+    mae = latest_run.get("metrics.test_mae", "N/A")
+    r2 = latest_run.get("metrics.test_r2", "N/A")
+    
+    print(f"\n📊 Métricas del último run:")
+    print(f"   Run ID: {run_id}")
+    print(f"   Test MSE: {mse:.4f}")
+    if mae != "N/A":
+        print(f"   Test MAE: {mae:.4f}")
+    if r2 != "N/A":
+        print(f"   Test R²:  {r2:.4f}")
+    
+    # Validar MSE
+    print(f"\n🔍 Validando MSE contra umbral: {threshold_mse}")
+    
+    if mse > threshold_mse:
+        print(f"\n❌ MSE demasiado alto ({mse:.4f} > {threshold_mse})")
+        print("   El modelo NO pasa la validación")
+        print("   No se puede promover a producción")
+        return None
+    else:
+        print(f"\n✅ MSE aceptable ({mse:.4f} <= {threshold_mse})")
+        print("   El modelo PASA la validación")
+        print("   Listo para promoción a producción")
+        return run_id
 
-try:
-    model = joblib.load(model_path)
-except FileNotFoundError:
-    print(f"--- ERROR: No se encontró el archivo del modelo en '{model_path}'. Asegúrate de que el paso 'make train' lo haya guardado correctamente en la raíz del proyecto. ---")
-    # Listar archivos en el directorio actual para depuración
-    print(f"--- Debug: Archivos en {os.getcwd()}: ---")
+
+def promote_model(run_id, model_name="diabetes-linear-regression"):
+    """
+    Promueve el modelo a la etapa 'Production' en el Model Registry
+    
+    Args:
+        run_id: ID del run a promover
+        model_name: Nombre del modelo registrado
+    """
     try:
-        print(os.listdir(os.getcwd()))
-    except Exception as list_err:
-        print(f"(No se pudo listar el directorio: {list_err})")
-    print("---")
-    sys.exit(1)  # Salir con error
+        client = mlflow.tracking.MlflowClient()
+        
+        # Buscar la versión del modelo asociada al run_id
+        model_versions = client.search_model_versions(f"name='{model_name}'")
+        
+        target_version = None
+        for mv in model_versions:
+            if mv.run_id == run_id:
+                target_version = mv.version
+                break
+        
+        if target_version:
+            # Transicionar a Production
+            client.transition_model_version_stage(
+                name=model_name,
+                version=target_version,
+                stage="Production"
+            )
+            print(f"\n🚀 Modelo '{model_name}' versión {target_version} promovido a Production")
+            return True
+        else:
+            print(f"\n⚠️  No se encontró versión del modelo para el run {run_id}")
+            return False
+            
+    except Exception as e:
+        print(f"\n⚠️  Error al promover modelo: {str(e)}")
+        print("   Continuando sin promoción automática...")
+        return False
 
-# --- Predicción y Validación ---
-print("--- Debug: Realizando predicciones ---")
-try:
-    y_pred = model.predict(X_test)  # Ahora X_test tiene 10 features
-except ValueError as pred_err:
-    print(f"--- ERROR durante la predicción: {pred_err} ---")
-    # Imprimir información de características si el error persiste
-    print(f"Modelo esperaba {model.n_features_in_} features.")
-    print(f"X_test tiene {X_test.shape[1]} features.")
-    sys.exit(1)
 
-mse = mean_squared_error(y_test, y_pred)
-print(f"🔍 MSE del modelo: {mse:.4f} (umbral: {THRESHOLD})")
+def main():
+    """Función principal"""
+    try:
+        # Configurar MLflow
+        setup_tracking_uri()
+        
+        # Nombre del experimento (debe coincidir con train.py)
+        experiment_name = "diabetes-regression"
+        
+        # Umbral de MSE (ajústalo según necesites)
+        threshold_mse = 3000
+        
+        # Validar último run
+        run_id = get_latest_run(experiment_name, threshold_mse)
+        
+        if run_id is None:
+            print(f"\n{'='*60}")
+            print("RESULTADO: VALIDACIÓN FALLIDA")
+            print(f"{'='*60}\n")
+            return 1
+        
+        # Intentar promover el modelo
+        promote_model(run_id)
+        
+        print(f"\n{'='*60}")
+        print("RESULTADO: VALIDACIÓN EXITOSA")
+        print(f"{'='*60}\n")
+        
+        return 0
+        
+    except Exception as e:
+        print(f"\n❌ Error durante la validación: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return 1
 
-# Validación
-if mse <= THRESHOLD:
-    print("✅ El modelo cumple los criterios de calidad.")
-    sys.exit(0)  # éxito
-else:
-    print("❌ El modelo no cumple el umbral. Deteniendo pipeline.")
-    sys.exit(1)  # error
+
+if __name__ == "__main__":
+    exit(main())

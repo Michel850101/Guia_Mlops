@@ -1,8 +1,8 @@
 aliases: []
 creation_timestamp: 1761094371503
-current_stage: None
+current_stage: Production
 description: null
-last_updated_timestamp: 1761094371503
+last_updated_timestamp: 1761095408976
 name: diabetes-linear-regression
 run_id: 274d36e859df4ff89cf8589cd87be3ef
 run_link: null
