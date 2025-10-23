@@ -98,3 +98,5 @@ jobs:
             echo ""
             echo "Los artefactos están disponibles en la pestaña Actions."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: 🧪 Prueba de despliegue (serve.py)
+        run: make serve-smoke
