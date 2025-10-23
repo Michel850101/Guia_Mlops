@@ -1,7 +1,7 @@
 import os, mlflow, pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 # ---------------------------
 # Configuración base
@@ -61,6 +61,11 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+
+@app.get("/", include_in_schema=False)
+def root():
+    """Redirige a la documentación interactiva."""
+    return RedirectResponse(url="/docs")
 
 class Features(BaseModel):
     data: list = []  # lista de filas, cada fila con 10 valores numéricos
