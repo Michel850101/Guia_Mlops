@@ -99,4 +99,12 @@ jobs:
             echo "Los artefactos están disponibles en la pestaña Actions."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: 🧪 Prueba de despliegue (serve.py)
-        run: make serve-smoke
+        run: |
+          uvicorn src.serve:app --host 127.0.0.1 --port 8000 --workers 1 &
+          UVICORN_PID=$!
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8000/health && break || sleep 1; done
+          curl -sf http://127.0.0.1:8000/info
+          printf '{ "data": [[0.03,0.05,0.06,0.02,-0.04,-0.03,-0.04,-0.002,0.019,-0.017]] }' > body.json
+          curl -sf -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" --data @body.json
+          kill $UVICORN_PID || true
+          wait $UVICORN_PID 2>/dev/null || true
