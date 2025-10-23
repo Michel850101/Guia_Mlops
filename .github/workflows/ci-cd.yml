@@ -45,6 +45,37 @@ jobs:
       - name: ✅ Validar modelo
         run: python src/validate.py
 
+      - name: 🚀 Levantar API (background) y pruebas de humo
+        env:
+          MLFLOW_TRACKING_URI: "file:./mlruns"
+        run: |
+          # 1) Arrancar uvicorn en segundo plano
+          uvicorn src.serve:app --host 127.0.0.1 --port 8000 --workers 1 &
+          UVICORN_PID=$!
+
+          # 2) Esperar a que /health responda
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+              echo "API lista"; break
+            fi
+            echo "Esperando API... ($i)"
+            sleep 1
+          done
+
+          # 3) Probar /info
+          curl -sS http://127.0.0.1:8000/info
+
+          # 4) Probar /predict con un payload mínimo (10 features)
+          cat > body.json << 'EOF'
+          { "data": [[0.03,0.05,0.06,0.02,-0.04,-0.03,-0.04,-0.002,0.019,-0.017]] }
+          EOF
+          curl -sS -X POST http://127.0.0.1:8000/predict \
+            -H "Content-Type: application/json" \
+            --data @body.json
+
+          # 5) Tumbar el servidor
+          kill $UVICORN_PID
+
       - name: 📤 Subir MLflow dir
         if: always()
         uses: actions/upload-artifact@v4
