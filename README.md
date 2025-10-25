@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/Framework-FastAPI-green.svg" alt="FastAPI">
   <img src="https://img.shields.io/badge/Tracking-MLflow-orange.svg" alt="MLflow">
-  <img src="https://github.com/Michel850101/mlflow-deploy/actions/workflows/ci-cd.yml/badge.svg" alt="CI/CD Status">
+  <img src="https://img.shields.io/badge/CI/CD-GitHub_Actions-black.svg" alt="GitHub Actions">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
 </p>
 
